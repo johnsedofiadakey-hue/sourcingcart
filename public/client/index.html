@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Sourcing Catalogue</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- Font preloads — all 4 sets, activated by theme class -->
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Outfit:wght@300;400;500;600&family=DM+Sans:wght@300;400;500;600&family=Syne:wght@500;600;700&family=Inter:wght@300;400;500;600&family=Lora:wght@400;500;600&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ── FONT THEMES ── */
+.font-elegant { --ff-head:'Playfair Display',serif; --ff-body:'Outfit',sans-serif; }
+.font-modern  { --ff-head:'DM Sans',sans-serif;     --ff-body:'DM Sans',sans-serif; }
+.font-bold    { --ff-head:'Syne',sans-serif;         --ff-body:'Inter',sans-serif; }
+.font-classic { --ff-head:'Lora',serif;              --ff-body:'Source Sans 3',sans-serif; }
+
+/* ── LIGHT MODE ── */
+.mode-light {
+  --bg:#FDFAF4; --surface:#FFFFFF; --surface2:#F7F2E8;
+  --text:#1A1410; --muted:#8A7A65; --border:rgba(0,0,0,.09);
+  --topbar-bg:var(--dark); --welcome-bg:linear-gradient(135deg,#2A2018 0%,#3D2E1E 100%);
+  --dark:#1A1410; --dark2:#2A2018;
+}
+/* ── DARK MODE ── */
+.mode-dark {
+  --bg:#0F0F0F; --surface:#1A1A1A; --surface2:#242424;
+  --text:#F0EDE8; --muted:#888; --border:rgba(255,255,255,.09);
+  --topbar-bg:#0A0A0A; --welcome-bg:linear-gradient(135deg,#1A1A1A 0%,#2A2A2A 100%);
+  --dark:#0A0A0A; --dark2:#141414;
+}
+
+/* ── COLOURS ─  injected via JS ── */
+:root{
+  --accent:#C9A84C;
+  --accent-pale:#FAF6ED;
+  --radius:14px; --radius-sm:8px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:var(--ff-body,'Outfit',sans-serif);background:var(--bg,#FDFAF4);color:var(--text,#1A1410);overscroll-behavior:none;transition:background .3s,color .3s;}
+#app{width:100%;height:100%;display:flex;flex-direction:column;}
+
+/* ── LOADING ── */
+#loading{position:fixed;inset:0;background:var(--dark,#1A1410);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:999;transition:opacity .5s;}
+#loading.out{opacity:0;pointer-events:none;}
+.loader-ring{width:44px;height:44px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--accent,#C9A84C);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loader-brand{font-size:13px;color:rgba(255,255,255,.35);letter-spacing:.1em;}
+
+/* ── NOT FOUND ── */
+#not-found{position:fixed;inset:0;background:var(--dark,#1A1410);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:998;}
+#not-found.show{display:flex;}
+.nf-icon{font-size:48px;}
+.nf-title{font-size:20px;color:rgba(255,255,255,.7);}
+.nf-sub{font-size:13px;color:rgba(255,255,255,.3);}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--topbar-bg,#1A1410);padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0px));display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.topbar-logo{display:flex;align-items:center;gap:10px;}
+.topbar-logo-img{width:28px;height:28px;border-radius:6px;object-fit:cover;display:none;}
+.topbar-brand{font-family:var(--ff-head,'Playfair Display',serif);font-size:16px;color:var(--accent,#C9A84C);font-weight:500;line-height:1.1;}
+.topbar-tagline{font-size:9px;color:rgba(255,255,255,.35);letter-spacing:.14em;text-transform:uppercase;}
+.cart-pill{background:var(--accent,#C9A84C);color:var(--dark,#1A1410);border:none;border-radius:50px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:var(--ff-body,'Outfit',sans-serif);transition:all .15s;white-space:nowrap;}
+.cart-pill:active{transform:scale(.95);}
+.cart-count{background:var(--dark,#1A1410);color:var(--accent,#C9A84C);border-radius:50%;width:20px;height:20px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+
+/* ── WELCOME ── */
+.welcome{background:var(--welcome-bg);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.welcome-av{width:40px;height:40px;border-radius:50%;background:var(--accent,#C9A84C);color:var(--dark,#1A1410);font-family:var(--ff-head,'Playfair Display',serif);font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.welcome-name{font-size:13px;font-weight:500;color:var(--accent,#C9A84C);}
+.welcome-hint{font-size:11px;color:rgba(255,255,255,.4);margin-top:1px;line-height:1.3;}
+
+/* ── PILLS ── */
+.pills-wrap{background:var(--dark,#1A1410);padding:9px 0 9px 16px;overflow-x:auto;display:flex;gap:8px;flex-shrink:0;scrollbar-width:none;}
+.pills-wrap::-webkit-scrollbar{display:none;}
+.cat-pill{background:rgba(255,255,255,.07);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.09);border-radius:50px;padding:6px 14px;font-size:12px;white-space:nowrap;cursor:pointer;transition:all .18s;flex-shrink:0;font-family:var(--ff-body,'Outfit',sans-serif);}
+.cat-pill.active{background:var(--accent,#C9A84C);color:var(--dark,#1A1410);border-color:var(--accent,#C9A84C);font-weight:600;}
+.pill-end{width:8px;flex-shrink:0;}
+
+/* ── GRID ── */
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 12px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));}
+.cat-block{margin-bottom:26px;}
+.cat-block-title{font-family:var(--ff-head,'Playfair Display',serif);font-size:18px;font-weight:500;margin-bottom:3px;padding:0 4px;color:var(--text);}
+.cat-block-desc{font-size:12px;color:var(--muted);margin-bottom:10px;padding:0 4px;line-height:1.5;}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+@media(min-width:480px){.grid{grid-template-columns:repeat(3,1fr);}}
+@media(min-width:680px){.grid{grid-template-columns:repeat(4,1fr);}}
+.p-card{background:var(--surface);border-radius:var(--radius);overflow:hidden;border:1.5px solid var(--border);cursor:pointer;transition:all .2s;position:relative;box-shadow:0 1px 6px rgba(0,0,0,.06);}
+.p-card:active{transform:scale(.97);}
+.p-card.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 4px 16px rgba(0,0,0,.15);}
+.sel-badge{display:none;position:absolute;top:8px;right:8px;background:var(--accent);color:var(--dark,#1A1410);font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;z-index:2;}
+.p-card.selected .sel-badge{display:block;}
+.card-imgs{width:100%;aspect-ratio:1/1;position:relative;overflow:hidden;background:var(--surface2);}
+.img-track{display:flex;width:100%;height:100%;transition:transform .3s ease;}
+.img-slide{min-width:100%;height:100%;flex-shrink:0;object-fit:cover;display:block;}
+.img-emoji{min-width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:50px;}
+.img-dots{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);display:flex;gap:4px;}
+.img-dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.45);}
+.img-dot.on{background:white;}
+.p-badge{position:absolute;top:8px;left:8px;font-size:9px;font-weight:600;padding:3px 8px;border-radius:20px;text-transform:uppercase;}
+.b-pop{background:rgba(201,168,76,.22);color:#7A5E00;border:1px solid rgba(201,168,76,.4);}
+.b-bud{background:rgba(26,107,60,.14);color:#145230;border:1px solid rgba(26,107,60,.3);}
+.p-info{padding:10px;}
+.p-name{font-size:12px;font-weight:600;margin-bottom:3px;line-height:1.3;color:var(--text);}
+.p-desc2{font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.p-price{font-family:var(--ff-head,'Playfair Display',serif);font-size:15px;font-weight:600;color:var(--accent);}
+.p-unit{font-size:9px;color:var(--muted);font-family:var(--ff-body,'Outfit',sans-serif);font-weight:400;}
+
+/* ── LIGHTBOX ── */
+#lb{display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,.96);flex-direction:column;}
+#lb.open{display:flex;}
+.lb-top{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top,0px));flex-shrink:0;}
+.lb-close{background:rgba(255,255,255,.1);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.lb-counter{font-size:12px;color:rgba(255,255,255,.4);}
+.lb-imgs{flex:1;position:relative;overflow:hidden;touch-action:pan-y pinch-zoom;}
+.lb-track{display:flex;height:100%;transition:transform .3s ease;}
+.lb-slide{min-width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:8px 44px;}
+.lb-slide img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;}
+.lb-emoji{font-size:110px;}
+.lb-arr{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.12);border:none;color:white;width:38px;height:38px;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:5;}
+.lb-arr.l{left:6px;} .lb-arr.r{right:6px;}
+.lb-dots{display:flex;gap:5px;justify-content:center;padding:8px 0 4px;}
+.lb-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25);transition:background .2s;}
+.lb-dot.on{background:var(--accent,#C9A84C);}
+.lb-info{padding:14px 20px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));background:rgba(10,10,10,.98);flex-shrink:0;}
+.lb-cat{font-size:10px;color:rgba(255,255,255,.35);letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px;}
+.lb-name{font-family:var(--ff-head,'Playfair Display',serif);font-size:18px;color:var(--accent,#C9A84C);margin-bottom:5px;}
+.lb-desc{font-size:12px;color:rgba(255,255,255,.68);line-height:1.6;margin-bottom:10px;max-height:60px;overflow-y:auto;}
+.lb-price{font-family:var(--ff-head,'Playfair Display',serif);font-size:21px;color:var(--accent,#C9A84C);font-weight:600;margin-bottom:12px;}
+.lb-price span{font-size:11px;color:rgba(255,255,255,.35);font-family:var(--ff-body,'Outfit',sans-serif);font-weight:400;}
+.lb-btn{width:100%;padding:14px;border-radius:50px;border:none;font-family:var(--ff-body,'Outfit',sans-serif);font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;}
+.lb-btn.add{background:var(--accent,#C9A84C);color:var(--dark,#1A1410);}
+.lb-btn.rem{background:rgba(255,255,255,.1);color:white;border:1px solid rgba(255,255,255,.2);}
+.lb-btn:active{transform:scale(.97);}
+
+/* ── CART ── */
+#cart-ov{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.5);}
+#cart-ov.open{display:block;}
+#cart-sheet{position:fixed;left:0;right:0;bottom:0;height:88vh;background:var(--surface,white);border-radius:20px 20px 0 0;display:flex;flex-direction:column;overflow:hidden;transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1);padding-bottom:env(safe-area-inset-bottom,0px);}
+#cart-ov.open #cart-sheet{transform:translateY(0);}
+.sh-handle{width:36px;height:4px;border-radius:2px;background:var(--surface2,#F7F2E8);margin:12px auto 0;flex-shrink:0;}
+.sh-hdr{padding:13px 20px 11px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.sh-title{font-family:var(--ff-head,'Playfair Display',serif);font-size:19px;font-weight:500;color:var(--text);}
+.sh-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.sh-items{flex:1;overflow-y:auto;padding:8px 16px;}
+.sh-empty{text-align:center;color:var(--muted);font-size:13px;padding:3rem 1rem;}
+.ci{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);align-items:center;}
+.ci-img{width:50px;height:50px;border-radius:10px;background:var(--surface2);flex-shrink:0;font-size:26px;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.ci-img img{width:100%;height:100%;object-fit:cover;}
+.ci-info{flex:1;min-width:0;}
+.ci-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);}
+.ci-cat{font-size:10px;color:var(--muted);}
+.ci-price{font-family:var(--ff-head,'Playfair Display',serif);font-size:16px;color:var(--accent);font-weight:600;white-space:nowrap;flex-shrink:0;}
+.ci-rm{background:none;border:none;color:#CC4444;cursor:pointer;font-size:17px;padding:4px 6px;flex-shrink:0;border-radius:6px;}
+.sh-footer{padding:13px 20px;border-top:1px solid var(--border);flex-shrink:0;background:var(--surface);}
+.total-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;}
+.total-lbl{font-size:12px;color:var(--muted);}
+.total-note{font-size:10px;color:var(--muted);margin-bottom:11px;line-height:1.5;}
+.total-amt{font-family:var(--ff-head,'Playfair Display',serif);font-size:27px;color:var(--accent);font-weight:600;}
+.exp-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.wa-btn{padding:13px;border-radius:50px;border:none;background:#25D366;color:white;font-family:var(--ff-body,'Outfit',sans-serif);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .2s;}
+.wa-btn:active{transform:scale(.97);}
+.pdf-btn{padding:13px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-family:var(--ff-body,'Outfit',sans-serif);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .2s;}
+.pdf-btn:active{transform:scale(.97);}
+.cp-ok{font-size:11px;color:#2A8A50;text-align:center;margin-top:5px;min-height:15px;}
+
+/* ── POWERED BY ── */
+.powered{text-align:center;padding:20px;font-size:10px;color:var(--muted);}
+.powered a{color:var(--muted);text-decoration:none;}
+</style>
+</head>
+<body class="font-elegant mode-light">
+
+<div id="loading"><div class="loader-ring"></div><div class="loader-brand">Loading your catalogue…</div></div>
+<div id="not-found"><div class="nf-icon">🔍</div><div class="nf-title">Catalogue not found</div><div class="nf-sub">This link may be incorrect or expired.</div></div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo">
+      <img class="topbar-logo-img" id="logo-img" src="" alt="" />
+      <div>
+        <div class="topbar-brand" id="brand-name">Sourcing Catalogue</div>
+        <div class="topbar-tagline" id="brand-tagline">FOB prices · USD</div>
+      </div>
+    </div>
+    <button class="cart-pill" onclick="openCart()">🛍 Cart <span class="cart-count" id="cart-count">0</span></button>
+  </div>
+  <div class="welcome">
+    <div class="welcome-av" id="welcome-av">?</div>
+    <div>
+      <div class="welcome-name" id="welcome-name">Welcome</div>
+      <div class="welcome-hint">Tap any item to view full details. Swipe photos to see more. Select what you love.</div>
+    </div>
+  </div>
+  <div class="pills-wrap" id="pills"><div class="pill-end"></div></div>
+  <div class="scroll" id="scroll"></div>
+</div>
+
+<!-- LIGHTBOX -->
+<div id="lb">
+  <div class="lb-top">
+    <button class="lb-close" onclick="closeLB()">✕</button>
+    <div class="lb-counter" id="lb-ctr"></div>
+  </div>
+  <div class="lb-imgs" id="lb-imgs">
+    <div class="lb-track" id="lb-track"></div>
+    <button class="lb-arr l" id="lb-prev" onclick="lbNav(-1)">‹</button>
+    <button class="lb-arr r" id="lb-next" onclick="lbNav(1)">›</button>
+  </div>
+  <div class="lb-dots" id="lb-dots"></div>
+  <div class="lb-info">
+    <div class="lb-cat" id="lb-cat"></div>
+    <div class="lb-name" id="lb-name"></div>
+    <div class="lb-desc" id="lb-desc"></div>
+    <div class="lb-price" id="lb-price"></div>
+    <button class="lb-btn" id="lb-btn" onclick="lbToggle()"></button>
+  </div>
+</div>
+
+<!-- CART -->
+<div id="cart-ov" onclick="cartOvClick(event)">
+  <div id="cart-sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-hdr"><div class="sh-title">My Selections</div><div class="sh-sub" id="cart-sub">Nothing selected yet</div></div>
+    <div class="sh-items" id="cart-items"></div>
+    <div class="sh-footer">
+      <div class="total-row"><div class="total-lbl">Total (FOB Guangzhou)</div><div class="total-amt" id="cart-total">$0</div></div>
+      <div class="total-note">⚠ Ex-factory FOB prices. Shipping, customs & Ghana delivery are separate.</div>
+      <div class="exp-btns">
+        <button class="wa-btn" onclick="sendWA()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          WhatsApp
+        </button>
+        <button class="pdf-btn" onclick="exportPDF()">📄 Download PDF</button>
+      </div>
+      <div class="cp-ok" id="cp-ok"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDsyZ-K49UW4jEaH5zrXKLQhUMXBWLO1pY",
+  authDomain: "sourcingcart-84b93.firebaseapp.com",
+  projectId: "sourcingcart-84b93",
+  storageBucket: "sourcingcart-84b93.firebasestorage.app",
+  messagingSenderId: "167536788679",
+  appId: "1:167536788679:web:915798e67a3172257b2ae2"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+// Get client ID from URL: /client/CLIENT_ID
+const pathParts = window.location.pathname.split('/');
+const clientId  = pathParts[pathParts.indexOf('client')+1];
+
+if(!clientId){
+  document.getElementById('loading').classList.add('out');
+  document.getElementById('not-found').classList.add('show');
+} else {
+  // Load client doc
+  getDoc(doc(db,'clients',clientId)).then(snap => {
+    if(!snap.exists()){
+      document.getElementById('loading').classList.add('out');
+      document.getElementById('not-found').classList.add('show');
+      return;
+    }
+    const client = {...snap.data(), _id:snap.id};
+    window._clientData = client;
+    applyTheme(client);
+    applyBranding(client);
+
+    // Live products + categories
+    window._cats  = [];
+    window._prods = [];
+
+    onSnapshot(query(collection(db,'categories'), where('clientId','==',clientId), orderBy('createdAt','asc')), snap2 => {
+      window._cats = snap2.docs.map(d=>({...d.data(),_id:d.id}));
+      renderCatalogue();
+    });
+    onSnapshot(query(collection(db,'products'), where('clientId','==',clientId), orderBy('createdAt','asc')), snap2 => {
+      window._prods = snap2.docs.map(d=>({...d.data(),_id:d.id}));
+      renderCatalogue();
+      // hide loader once first product data arrives
+      document.getElementById('loading').classList.add('out');
+    });
+
+    // Fallback: hide loader after 3s even if empty
+    setTimeout(()=>document.getElementById('loading').classList.add('out'),3000);
+  }).catch(()=>{
+    document.getElementById('loading').classList.add('out');
+    document.getElementById('not-found').classList.add('show');
+  });
+}
+
+function applyTheme(client){
+  const th = client.theme || {};
+  // Accent colour
+  const color = th.color || '#C9A84C';
+  const pale  = hexToRgba(color, 0.12);
+  document.documentElement.style.setProperty('--accent', color);
+  document.documentElement.style.setProperty('--accent-pale', pale);
+  // Mode
+  document.body.classList.remove('mode-light','mode-dark');
+  document.body.classList.add('mode-'+(th.mode||'light'));
+  // Font
+  document.body.classList.remove('font-elegant','font-modern','font-bold','font-classic');
+  document.body.classList.add('font-'+(th.font||'elegant'));
+  // Page title
+  document.title = (client.displayName||client.name||'Sourcing Catalogue') + ' · Catalogue';
+}
+
+function applyBranding(client){
+  document.getElementById('brand-name').textContent = client.displayName||client.name||'Sourcing Catalogue';
+  if(client.tagline) document.getElementById('brand-tagline').textContent = client.tagline;
+  if(client.logoUrl){
+    const img=document.getElementById('logo-img');
+    img.src=client.logoUrl; img.style.display='block';
+  }
+  const name = client.displayName||client.name||'Client';
+  document.getElementById('welcome-name').textContent = 'Welcome, '+name;
+  document.getElementById('welcome-av').textContent = name[0].toUpperCase();
+}
+
+function hexToRgba(hex,a){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+</script>
+
+<script>
+const WA = '233598455012';
+let basket={}, lbId=null, lbImgIdx=0, lbTX=null;
+
+function cats(){ return window._cats||[]; }
+function prods(){ return window._prods||[]; }
+
+// ── CATALOGUE ──
+function renderCatalogue(){
+  const pills=document.getElementById('pills');
+  const scroll=document.getElementById('scroll');
+  pills.innerHTML='<div class="pill-end"></div>';
+  scroll.innerHTML='';
+  const activeCats=cats().filter(c=>prods().some(p=>p.cat===c._id));
+  if(!activeCats.length && (window._prods||[]).length===0) return;
+  if(!activeCats.length){
+    scroll.innerHTML='<div style="text-align:center;padding:3rem 1rem;color:var(--muted);font-size:14px;">Catalogue coming soon.</div>';
+    return;
+  }
+  activeCats.forEach((cat,i)=>{
+    const pill=document.createElement('button');
+    pill.className='cat-pill'+(i===0?' active':'');
+    pill.textContent=cat.emoji+' '+cat.label;
+    pill.onclick=()=>{
+      document.querySelectorAll('.cat-pill').forEach(p=>p.classList.remove('active'));
+      pill.classList.add('active');
+      document.getElementById('block-'+cat._id)?.scrollIntoView({behavior:'smooth',block:'start'});
+    };
+    pills.insertBefore(pill,pills.lastChild);
+    const block=document.createElement('div');
+    block.className='cat-block'; block.id='block-'+cat._id;
+    block.innerHTML=`<div class="cat-block-title">${cat.label}</div><div class="cat-block-desc">${cat.desc}</div><div class="grid" id="grid-${cat._id}"></div>`;
+    scroll.appendChild(block);
+    renderGrid(cat._id);
+  });
+  const end=document.createElement('div');
+  end.innerHTML=`<div class="powered">Sourced by <a href="https://glasstechfabrications.com" target="_blank">Glasstech Fabrications</a></div>`;
+  scroll.appendChild(end);
+  scroll.onscroll=()=>{
+    const top=scroll.scrollTop+80; let active=activeCats[0]?._id;
+    activeCats.forEach(c=>{const el=document.getElementById('block-'+c._id);if(el&&el.offsetTop<=top)active=c._id;});
+    document.querySelectorAll('.cat-pill').forEach((p,i)=>p.classList.toggle('active',activeCats[i]?._id===active));
+  };
+}
+
+function renderGrid(catId){
+  const grid=document.getElementById('grid-'+catId);if(!grid)return;
+  grid.innerHTML='';
+  prods().filter(p=>p.cat===catId).forEach(p=>{
+    const card=document.createElement('div');
+    card.className='p-card'+(basket[p._id]?' selected':'');
+    card.id='card-'+p._id;
+    const imgs=p.imgs||[];
+    let imgHTML;
+    if(imgs.length>0){
+      imgHTML=`<div class="card-imgs" onclick="openLB('${p._id}')">
+        <div class="img-track" id="itr-${p._id}">${imgs.map(s=>`<img class="img-slide" src="${s}" loading="lazy"/>`).join('')}</div>
+        ${imgs.length>1?`<div class="img-dots">${imgs.map((_,i)=>`<div class="img-dot${i===0?' on':''}"></div>`).join('')}</div>`:''}
+        ${p.badge==='popular'?'<div class="p-badge b-pop">★ Popular</div>':''}
+        ${p.badge==='budget'?'<div class="p-badge b-bud">✓ Budget</div>':''}
+      </div>`;
+    } else {
+      imgHTML=`<div class="card-imgs" style="background:${p.bg||'#F7F2E8'}" onclick="openLB('${p._id}')">
+        <div class="img-emoji">${p.emoji}</div>
+        ${p.badge==='popular'?'<div class="p-badge b-pop">★ Popular</div>':''}
+        ${p.badge==='budget'?'<div class="p-badge b-bud">✓ Budget</div>':''}
+      </div>`;
+    }
+    card.innerHTML=`<div class="sel-badge">✓ Selected</div>${imgHTML}
+      <div class="p-info" onclick="openLB('${p._id}')">
+        <div class="p-name">${p.name}</div>
+        <div class="p-desc2">${p.desc}</div>
+        <div class="p-price">$${Number(p.price).toLocaleString()} <span class="p-unit">${p.unit} FOB</span></div>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+function refreshCard(pid){ const c=document.getElementById('card-'+pid); if(c)c.classList.toggle('selected',!!basket[pid]); }
+
+// ── LIGHTBOX ──
+function openLB(pid){ lbId=pid; lbImgIdx=0; renderLB(); document.getElementById('lb').classList.add('open'); }
+function renderLB(){
+  const p=prods().find(x=>x._id==lbId); if(!p)return;
+  const cat=cats().find(c=>c._id===p.cat);
+  const imgs=p.imgs||[];
+  const track=document.getElementById('lb-track');
+  track.innerHTML=imgs.length>0?imgs.map(s=>`<div class="lb-slide"><img src="${s}" /></div>`).join(''):`<div class="lb-slide"><div class="lb-emoji">${p.emoji}</div></div>`;
+  track.style.transition='none';
+  track.style.transform=`translateX(-${lbImgIdx*100}%)`;
+  setTimeout(()=>track.style.transition='transform .3s ease',50);
+  const dots=document.getElementById('lb-dots');
+  dots.innerHTML=imgs.length>1?imgs.map((_,i)=>`<div class="lb-dot${i===lbImgIdx?' on':''}"></div>`).join(''):'';
+  document.getElementById('lb-ctr').textContent=imgs.length>1?`${lbImgIdx+1} / ${imgs.length}`:'';
+  ['lb-prev','lb-next'].forEach(id=>document.getElementById(id).style.display=imgs.length>1?'flex':'none');
+  document.getElementById('lb-prev').style.opacity=lbImgIdx>0?'1':'0.25';
+  document.getElementById('lb-next').style.opacity=lbImgIdx<imgs.length-1?'1':'0.25';
+  document.getElementById('lb-cat').textContent=cat?.label||'';
+  document.getElementById('lb-name').textContent=p.name;
+  document.getElementById('lb-desc').textContent=p.desc;
+  document.getElementById('lb-price').innerHTML=`$${Number(p.price).toLocaleString()} <span>${p.unit} · FOB Guangzhou</span>`;
+  const btn=document.getElementById('lb-btn');
+  if(basket[p._id]){btn.textContent='✕ Remove from selections';btn.className='lb-btn rem';}
+  else{btn.textContent='+ Add to my selections';btn.className='lb-btn add';}
+}
+function lbNav(dir){
+  const p=prods().find(x=>x._id==lbId);if(!p)return;
+  const imgs=p.imgs||[];
+  lbImgIdx=Math.max(0,Math.min(imgs.length-1,lbImgIdx+dir));
+  document.getElementById('lb-track').style.transform=`translateX(-${lbImgIdx*100}%)`;
+  document.getElementById('lb-dots').querySelectorAll('.lb-dot').forEach((d,i)=>d.classList.toggle('on',i===lbImgIdx));
+  document.getElementById('lb-ctr').textContent=imgs.length>1?`${lbImgIdx+1} / ${imgs.length}`:'';
+  document.getElementById('lb-prev').style.opacity=lbImgIdx>0?'1':'0.25';
+  document.getElementById('lb-next').style.opacity=lbImgIdx<imgs.length-1?'1':'0.25';
+}
+function lbToggle(){
+  const p=prods().find(x=>x._id==lbId);if(!p)return;
+  if(basket[p._id]) delete basket[p._id]; else basket[p._id]=p;
+  refreshCard(p._id); updateCount(); renderLB();
+}
+function closeLB(){ document.getElementById('lb').classList.remove('open'); }
+
+const lbEl=document.getElementById('lb-imgs');
+lbEl.addEventListener('touchstart',e=>{lbTX=e.touches[0].clientX;},{passive:true});
+lbEl.addEventListener('touchend',e=>{if(lbTX===null)return;const dx=e.changedTouches[0].clientX-lbTX;if(Math.abs(dx)>45)lbNav(dx<0?1:-1);lbTX=null;},{passive:true});
+
+// ── CART ──
+function updateCount(){ document.getElementById('cart-count').textContent=Object.keys(basket).length; }
+function openCart(){ renderCart(); document.getElementById('cart-ov').classList.add('open'); }
+function cartOvClick(e){ if(e.target===document.getElementById('cart-ov'))document.getElementById('cart-ov').classList.remove('open'); }
+function removeItem(pid){ delete basket[pid]; refreshCard(pid); updateCount(); renderCart(); }
+
+function renderCart(){
+  const items=Object.values(basket);
+  const total=items.reduce((s,p)=>s+Number(p.price),0);
+  document.getElementById('cart-total').textContent='$'+total.toLocaleString();
+  document.getElementById('cart-sub').textContent=items.length?`${items.length} item${items.length!==1?'s':''} selected`:'Nothing selected yet';
+  const el=document.getElementById('cart-items');
+  if(!items.length){el.innerHTML='<div class="sh-empty">Tap items in the catalogue to add them here.</div>';return;}
+  const bycat={};
+  items.forEach(p=>{const l=cats().find(c=>c._id===p.cat)?.label||'Other';if(!bycat[l])bycat[l]=[];bycat[l].push(p);});
+  el.innerHTML=Object.entries(bycat).map(([cat,ps])=>
+    `<div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;padding:9px 0 3px">${cat}</div>`+
+    ps.map(p=>{
+      const fi=p.imgs?.length>0?p.imgs[0]:'';
+      const th=fi?`<div class="ci-img"><img src="${fi}"/></div>`:`<div class="ci-img">${p.emoji}</div>`;
+      return `<div class="ci">${th}<div class="ci-info"><div class="ci-name">${p.name}</div><div class="ci-cat">${p.unit}·FOB</div></div><div class="ci-price">$${Number(p.price).toLocaleString()}</div><button class="ci-rm" onclick="removeItem('${p._id}')">✕</button></div>`;
+    }).join('')
+  ).join('');
+}
+
+function buildMsg(){
+  const items=Object.values(basket);if(!items.length)return'';
+  const total=items.reduce((s,p)=>s+Number(p.price),0);
+  const client=window._clientData;
+  const bycat={};items.forEach(p=>{const l=cats().find(c=>c._id===p.cat)?.label||'Other';if(!bycat[l])bycat[l]=[];bycat[l].push(p);});
+  const lines=[`*${client?.displayName||client?.name||'Client'} — Sourcing Selections*`,`Date: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`,''];
+  for(const[cat,ps]of Object.entries(bycat)){lines.push(`*${cat}*`);ps.forEach(p=>lines.push(`  • ${p.name} — $${Number(p.price).toLocaleString()} ${p.unit} FOB`));lines.push('');}
+  lines.push(`*TOTAL (FOB Guangzhou): $${total.toLocaleString()}*`);
+  lines.push('_Ex-factory FOB. Shipping, customs & local delivery separate._');
+  lines.push('_Sourced by Glasstech Fabrications · glasstechfabrications.com_');
+  return lines.join('\n');
+}
+function sendWA(){ const t=buildMsg();if(!t){showOk('No items selected.');return;}window.open(`https://wa.me/${WA}?text=${encodeURIComponent(t)}`,'_blank'); }
+function showOk(m){ const el=document.getElementById('cp-ok');el.textContent=m;setTimeout(()=>el.textContent='',3500); }
+
+async function exportPDF(){
+  const items=Object.values(basket);
+  if(!items.length){showOk('No items selected.');return;}
+  showOk('Generating PDF…');
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const client=window._clientData;
+  const W=210,M=18;let y=0;
+  const accentHex=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#C9A84C';
+  const r=parseInt(accentHex.slice(1,3),16),g=parseInt(accentHex.slice(3,5),16),b=parseInt(accentHex.slice(5,7),16);
+  doc.setFillColor(r,g,b);doc.rect(0,0,W,28,'F');
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(15);
+  doc.text((client?.displayName||client?.name||'Sourcing Catalogue').toUpperCase(),W/2,11,{align:'center'});
+  doc.setFontSize(9);doc.setFont('helvetica','normal');
+  doc.text('China Import Selections — FOB Guangzhou Prices (USD)',W/2,20,{align:'center'});
+  y=36;
+  doc.setTextColor(80,60,30);doc.setFontSize(9);
+  doc.text(`Date: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`,M,y);
+  y+=6;doc.setTextColor(140,120,100);doc.setFontSize(8);
+  doc.text('Ex-factory FOB prices. Shipping, customs & local delivery are separate.',M,y,{maxWidth:W-M*2});y+=10;
+  const bycat={};items.forEach(p=>{const l=cats().find(c=>c._id===p.cat)?.label||'Other';if(!bycat[l])bycat[l]=[];bycat[l].push(p);});
+  const total=items.reduce((s,p)=>s+Number(p.price),0);
+  for(const[cat,ps]of Object.entries(bycat)){
+    if(y>265){doc.addPage();y=20;}
+    doc.setFillColor(250,246,237);doc.rect(M-3,y-4,W-M*2+6,10,'F');
+    doc.setTextColor(100,70,20);doc.setFont('helvetica','bold');doc.setFontSize(10);
+    doc.text(cat.toUpperCase(),M,y+2);y+=10;
+    doc.setFillColor(240,235,225);doc.rect(M-3,y-3,W-M*2+6,7,'F');
+    doc.setTextColor(100,80,50);doc.setFontSize(8);doc.setFont('helvetica','bold');
+    doc.text('Product',M,y+2);doc.text('Unit',130,y+2);doc.text('FOB Price',W-M+3,y+2,{align:'right'});y+=8;
+    ps.forEach((p,i)=>{
+      if(y>265){doc.addPage();y=20;}
+      if(i%2===0){doc.setFillColor(253,250,244);doc.rect(M-3,y-3,W-M*2+6,9,'F');}
+      doc.setTextColor(30,24,16);doc.setFont('helvetica','normal');doc.setFontSize(9);
+      doc.text(doc.splitTextToSize(p.name,95)[0],M,y+2);
+      doc.setTextColor(120,100,70);doc.setFontSize(8);doc.text(p.unit,130,y+2);
+      doc.setTextColor(r,g,b);doc.setFont('helvetica','bold');doc.setFontSize(10);
+      doc.text(`$${Number(p.price).toLocaleString()}`,W-M+3,y+2,{align:'right'});y+=9;
+      if(p.desc){if(y>265){doc.addPage();y=20;}doc.setTextColor(140,120,90);doc.setFont('helvetica','italic');doc.setFontSize(7.5);doc.text(doc.splitTextToSize(p.desc,W-M*2-8).slice(0,2).join(' '),M+2,y+1);y+=6;}
+    });y+=4;
+  }
+  if(y>260){doc.addPage();y=20;}
+  doc.setFillColor(r,g,b);doc.rect(M-3,y,W-M*2+6,12,'F');
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(12);
+  doc.text('TOTAL (FOB GUANGZHOU)',M,y+8);doc.text(`$${total.toLocaleString()}`,W-M+3,y+8,{align:'right'});y+=20;
+  doc.setTextColor(160,140,110);doc.setFontSize(8);doc.setFont('helvetica','normal');
+  doc.text('Sourced by Glasstech Fabrications · glasstechfabrications.com',W/2,y,{align:'center'});
+  const fname=(client?.name||'Selections').replace(/\s+/g,'_');
+  doc.save(`${fname}_Selections.pdf`);
+  showOk('✓ PDF downloaded!');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Clients — public read (needed for client catalogue page)
+    // Write only from admin (we rely on PIN for now; tighten later with Auth)
+    match /clients/{clientId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Categories — public read for the right clientId
+    match /categories/{catId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Products — public read for the right clientId
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Meta (seed sentinel)
+    match /meta/{docId} {
+      allow read, write: if true;
+    }
+  }
+}
