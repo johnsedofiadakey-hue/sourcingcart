@@ -378,7 +378,7 @@ body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);}
 <div class="modal-overlay" id="modal-add-product">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">Add Product</div>
+      <div class="modal-title" id="mp-modal-title">Add Product</div>
       <button class="modal-close" onclick="closeModal('modal-add-product')">✕</button>
     </div>
     <div class="modal-body">
@@ -503,6 +503,7 @@ window._createClient = async (data) => addDoc(collection(db,'clients'), {...data
 window._deleteClient = async (id) => deleteDoc(doc(db,'clients',id));
 window._updateClient = async (id, data) => updateDoc(doc(db,'clients',id), data);
 window._addProduct = async (data) => addDoc(collection(db,'products'), {...data, createdAt: serverTimestamp()});
+window._updateProduct = async (id, data) => updateDoc(doc(db,'products',id), data);
 window._deleteProduct = async (id) => deleteDoc(doc(db,'products',id));
 window._addCat = async (data) => addDoc(collection(db,'categories'), {...data, createdAt: serverTimestamp()});
 window._deleteCat = async (id) => deleteDoc(doc(db,'categories',id));
@@ -534,6 +535,7 @@ let mcEmoji='💡';
 let mpImgs=[];
 let activeLinkId='', activeLinkUrl='';
 window._activeClientId = null;
+let editingProductId = null;
 
 // ════════════════════════════════
 // PIN
@@ -762,7 +764,7 @@ function renderProdsScreen(clientId){
           const catLabel=(clientCats.find(c=>c._id===p.cat)||{}).label||'—';
           const fi=p.imgs&&p.imgs.length>0?p.imgs[0]:'';
           const thumb=fi?`<div class="prod-thumb"><img src="${fi}" />${p.imgs.length>1?`<div class="prod-thumb-badge">+${p.imgs.length}</div>`:''}</div>`:`<div class="prod-thumb">${p.emoji}</div>`;
-          return `<div class="prod-row" data-cat="${p.cat}">${thumb}<div class="prod-info"><div class="prod-name">${p.name}</div><div class="prod-meta">${catLabel} · ${p.unit}${p.badge?` · <span class="tag tag-gold">${p.badge}</span>`:''}</div></div><div class="prod-price" style="color:${color}">$${Number(p.price).toLocaleString()}</div><button class="btn btn-danger btn-sm btn-icon" style="margin-left:8px" onclick="deleteProduct('${p._id}')">✕</button></div>`;
+          return `<div class="prod-row" data-cat="${p.cat}">${thumb}<div class="prod-info"><div class="prod-name">${p.name}</div><div class="prod-meta">${catLabel} · ${p.unit}${p.badge?` · <span class="tag tag-gold">${p.badge}</span>`:''}</div></div><div class="prod-price" style="color:${color}">$${Number(p.price).toLocaleString()}</div><div style="display:flex;gap:4px;margin-left:8px;"><button class="btn btn-outline btn-sm btn-icon" onclick="openEditProduct('${p._id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteProduct('${p._id}')">✕</button></div></div>`;
         }).join('')}
       </div>
     </div></div>`;
@@ -778,6 +780,9 @@ function filterProds(catId, el){
 
 function openAddProduct(){
   if(!window._activeClientId){alert('Select a client first.');return;}
+  editingProductId = null;
+  document.getElementById('mp-modal-title').textContent = 'Add Product';
+  document.getElementById('mp-save-btn').textContent = 'Add Product';
   repopMpCat(window._activeClientId);
   mpImgs=[]; renderMpThumbs();
   ['mp-name','mp-desc','mp-price','mp-unit'].forEach(id=>document.getElementById(id).value='');
@@ -785,6 +790,30 @@ function openAddProduct(){
   buildEmojiGrid('mp-emoji-grid', e=>{mpEmoji=e;}, ()=>mpEmoji);
   buildBgStrip();
   mpSetBadge('none');
+  openModal('modal-add-product');
+}
+
+function openEditProduct(id){
+  const p = window._allProducts.find(x=>x._id===id);
+  if(!p) return;
+  editingProductId = id;
+  document.getElementById('mp-modal-title').textContent = 'Edit Product';
+  document.getElementById('mp-save-btn').textContent = 'Save Changes';
+  repopMpCat(window._activeClientId);
+  document.getElementById('mp-name').value = p.name;
+  document.getElementById('mp-cat').value = p.cat;
+  document.getElementById('mp-desc').value = p.desc;
+  document.getElementById('mp-price').value = p.price;
+  document.getElementById('mp-unit').value = p.unit;
+  mpEmoji = p.emoji || '💡';
+  mpBg = p.bg || BGS[0];
+  mpBadge = p.badge || 'none';
+  mpImgs = [...(p.imgs || [])];
+  renderMpThumbs();
+  buildEmojiGrid('mp-emoji-grid', e=>{mpEmoji=e;}, ()=>mpEmoji);
+  buildBgStrip();
+  mpSetBadge(mpBadge || 'none');
+  document.getElementById('mp-msg').className='form-msg';
   openModal('modal-add-product');
 }
 
@@ -819,13 +848,18 @@ async function saveProduct(){
   const btn=document.getElementById('mp-save-btn');
   btn.disabled=true;btn.textContent='Saving…';
   try{
-    await window._addProduct({clientId:window._activeClientId,cat,name,desc,price,unit,emoji:mpEmoji,bg:mpBg,badge:mpBadge==='none'?'':mpBadge,imgs:[...mpImgs]});
+    const data = {clientId:window._activeClientId,cat,name,desc,price,unit,emoji:mpEmoji,bg:mpBg,badge:mpBadge==='none'?'':mpBadge,imgs:[...mpImgs]};
+    if(editingProductId){
+      await window._updateProduct(editingProductId, data);
+    } else {
+      await window._addProduct(data);
+    }
     closeModal('modal-add-product');
   } catch(e){
     msg.className='form-msg err';msg.textContent='Error saving. Check connection.';
     console.error(e);
   }
-  btn.disabled=false;btn.textContent='Add Product';
+  btn.disabled=false;btn.textContent=editingProductId ? 'Save Changes' : 'Add Product';
 }
 
 async function deleteProduct(id){
